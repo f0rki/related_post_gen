@@ -146,7 +146,7 @@ run_rust_pgo() {
         cargo clean && 
         ../rust-pgo-build.sh &&
         if [ $HYPER == 1 ]; then
-            capture "Rust nightly+PGO" hyperfine -r $runs -w $warmup --show-output "./target/release/rust"
+            capture "Rust nightly+PGO" hyperfine -r $runs -w $warmup --show-output "./target/x86_64-unknown-linux-gnu/release/rust"
         else
             command ${time} -f '%es %Mk' ./target/release/rust
         fi
@@ -175,7 +175,7 @@ run_rust_con_pgo() {
         cargo clean && 
         ../rust-pgo-build.sh &&
         if [ $HYPER == 1 ]; then
-            capture "Rust Concurrent nightly+PGO" hyperfine -r $runs -w $warmup --show-output "./target/release/rust_rayon"
+            capture "Rust Concurrent nightly+PGO" hyperfine -r $runs -w $warmup --show-output "./target/x86_64-unknown-linux-gnu/release/rust_rayon"
         else
             command ${time} -f '%es %Mk' ./target/release/rust_rayon
         fi

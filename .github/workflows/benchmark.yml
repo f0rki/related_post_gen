@@ -23,8 +23,8 @@ jobs:
             - name: Install nightly Rust
               run: |
                   rustup toolchain install nightly
-                  rustup component add llvm-tools
-                  cargo +nightly install cargo-binutils
+                  rustup component add llvm-tools-preview
+                  cargo +nightly install cargo-pgo
 
             - name: Install Go
               uses: actions/setup-go@v4
