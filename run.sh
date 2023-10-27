@@ -129,6 +129,7 @@ run_cpp_con() {
 run_rust() {
     echo "Running Rust" &&
         cd ./rust &&
+        cargo clean && 
         cargo build --release &&
         if [ $HYPER == 1 ]; then
             capture "Rust" hyperfine -r $runs -w $warmup --show-output "./target/release/rust"
@@ -139,12 +140,42 @@ run_rust() {
     check_output "related_posts_rust.json"
 }
 
+run_rust_pgo() {
+    echo "Running Rust (nightly+PGO)" &&
+        cd ./rust &&
+        cargo clean && 
+        ../rust-pgo-build.sh &&
+        if [ $HYPER == 1 ]; then
+            capture "Rust nightly+PGO" hyperfine -r $runs -w $warmup --show-output "./target/release/rust"
+        else
+            command ${time} -f '%es %Mk' ./target/release/rust
+        fi
+
+    check_output "related_posts_rust.json"
+}
+
 run_rust_con() {
     echo "Running Rust Rayon" &&
         cd ./rust_con &&
+        cargo clean && 
         cargo build --release &&
         if [ $HYPER == 1 ]; then
             capture "Rust Concurrent" hyperfine -r $runs -w $warmup --show-output "./target/release/rust_rayon"
+        else
+            command ${time} -f '%es %Mk' ./target/release/rust_rayon
+        fi
+
+    check_output "related_posts_rust_con.json"
+
+}
+
+run_rust_con_pgo() {
+    echo "Running Rust Rayon (nightly+PGO)" &&
+        cd ./rust_con &&
+        cargo clean && 
+        ../rust-pgo-build.sh &&
+        if [ $HYPER == 1 ]; then
+            capture "Rust Concurrent nightly+PGO" hyperfine -r $runs -w $warmup --show-output "./target/release/rust_rayon"
         else
             command ${time} -f '%es %Mk' ./target/release/rust_rayon
         fi
@@ -782,9 +813,17 @@ elif [ "$first_arg" = "rust" ]; then
 
     run_rust
 
+elif [ "$first_arg" = "rust_pgo" ]; then
+
+    run_rust_pgo
+
 elif [ "$first_arg" = "rust_con" ]; then
 
     run_rust_con
+
+elif [ "$first_arg" = "rust_con_pgo" ]; then
+
+    run_rust_con_pgo
 
 elif [ "$first_arg" = "py" ]; then
 
@@ -961,6 +1000,8 @@ elif [ "$first_arg" = "all" ]; then
         run_go_concurrent || echo -e "\n" &&
         run_rust || echo -e "\n" &&
         run_rust_con || echo -e "\n" &&
+        run_rust_pgo || echo -e "\n" &&
+        run_rust_con_pgo || echo -e "\n" &&
         run_d || echo -e "\n" &&
         run_d_con || echo -e "\n" &&
         run_cpp || echo -e "\n" &&

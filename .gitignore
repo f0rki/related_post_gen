@@ -1,5 +1,7 @@
 rust/target
 rust_con/target
+*.profraw
+*.profdata
 go/related
 go_con/related_concurrent
 odin/main

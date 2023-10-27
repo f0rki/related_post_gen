@@ -17,8 +17,14 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v4
 
-            - name: Install  Rust
+            - name: Install Rust
               uses: dtolnay/rust-toolchain@stable
+            
+            - name: Install nightly Rust
+              run: |
+                  rustup toolchain install nightly
+                  rustup component add llvm-tools
+                  cargo +nightly install cargo-binutils
 
             - name: Install Go
               uses: actions/setup-go@v4
