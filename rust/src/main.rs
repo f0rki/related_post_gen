@@ -1,10 +1,11 @@
-use std::{collections::BinaryHeap, hint, time::Instant};
+use std::{cmp::Ordering, collections::BinaryHeap, hint, time::Instant};
 
 use bumpalo::collections::Vec as BVec;
 use bumpalo::Bump;
 use rustc_data_structures::fx::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
+use smallvec::SmallVec;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
@@ -21,66 +22,21 @@ struct Post<'a> {
 const NUM_TOP_ITEMS: usize = 5;
 
 #[derive(Serialize)]
-struct RelatedPosts<'a> {
+struct RelatedPosts<'a, const TOPN: usize> {
     #[serde(rename = "_id")]
     id: &'a str,
     tags: &'a [&'a str],
-    related: Vec<&'a Post<'a>>,
-}
-
-#[derive(Eq)]
-struct PostCount {
-    post: u32,
-    count: u8,
-}
-
-impl std::cmp::PartialEq for PostCount {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.count == other.count
-    }
-}
-
-impl std::cmp::PartialOrd for PostCount {
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl std::cmp::Ord for PostCount {
-    #[inline]
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        // reverse order
-        other.count.cmp(&self.count)
-    }
-}
-
-fn least_n<T: Ord>(n: usize, mut from: impl Iterator<Item = T>) -> impl Iterator<Item = T> {
-    let mut h = BinaryHeap::from_iter(from.by_ref().take(n));
-
-    for it in from {
-        // heap thinks the smallest is the greatest because of reverse order
-        let mut greatest = h.peek_mut().unwrap();
-
-        if it < *greatest {
-            // heap rebalances after the smart pointer is dropped
-            *greatest = it;
-        }
-    }
-    h.into_iter()
+    related: SmallVec<[&'a Post<'a>; TOPN]>,
 }
 
 fn main() {
     let json_str = std::fs::read_to_string("../posts.json").unwrap();
     let posts: Vec<Post> = from_str(&json_str).unwrap();
+    assert!(posts.len() > 5, "current implementation panics for posts that cannot have");
 
-    let start = Instant::now();
+    let start = hint::black_box(Instant::now());
 
-    let cap = (posts.len() * std::mem::size_of::<u8>()).next_power_of_two();
-    let arena = Bump::with_capacity(cap);
-
-    let mut post_tags_map: FxHashMap<&str, Vec<u32>> = FxHashMap::default();
+    let mut post_tags_map: FxHashMap<&str, SmallVec<[u32; 8]>> = FxHashMap::default();
 
     for (post_idx, post) in posts.iter().enumerate() {
         for tag in &post.tags {
@@ -88,42 +44,48 @@ fn main() {
         }
     }
 
-    let related_posts: Vec<RelatedPosts<'_>> = posts
-        .iter()
-        .enumerate()
-        .map(|(post_idx, post)| {
-            let mut tagged_post_count: BVec<u8> = BVec::with_capacity_in(posts.len(), &arena);
-            tagged_post_count.resize(posts.len(), 0);
+    let mut related_posts: Vec<RelatedPosts<'_, NUM_TOP_ITEMS>> = Vec::with_capacity(posts.len());
+    let mut tagged_post_count: Vec<u8> = Vec::with_capacity(posts.len());
+    tagged_post_count.resize(posts.len(), 0);
 
-            for tag in &post.tags {
-                if let Some(tag_posts) = post_tags_map.get(tag) {
-                    for other_post_idx in tag_posts {
-                        tagged_post_count[*other_post_idx as usize] += 1;
-                    }
+    for (post_idx, post) in posts.iter().enumerate() {
+        tagged_post_count.fill(0);
+
+        for tag in &post.tags {
+            if let Some(tag_posts) = post_tags_map.get(tag) {
+                for other_post_idx in tag_posts {
+                    tagged_post_count[*other_post_idx as usize] += 1;
                 }
             }
+        }
+        tagged_post_count[post_idx] = 0; // don't recommend the same post
 
-            tagged_post_count[post_idx] = 0; // don't recommend the same post
+        let mut top_n_counts: [u8; NUM_TOP_ITEMS] = [0u8; NUM_TOP_ITEMS];
+        let mut top_n_posts: [&Post; NUM_TOP_ITEMS] = [&posts[0], &posts[1], &posts[2], &posts[3], &posts[4]];
+        let mut min_tags = 0u8;
+        for (post, count) in tagged_post_count.iter().copied().enumerate() {
+            if count > min_tags {
+                let mut i = NUM_TOP_ITEMS - 1;
+                while i > 0 && top_n_counts[i - 1] < count {
+                    // rotate top_n
+                    top_n_counts[i] = top_n_counts[i - 1];
+                    top_n_posts[i] = top_n_posts[i - 1];
+                    i -= 1;
+                }
+                // insert into top_n
+                top_n_counts[i] = count;
+                top_n_posts[i] = &posts[post];
 
-            let top = least_n(
-                NUM_TOP_ITEMS,
-                tagged_post_count
-                    .iter()
-                    .enumerate()
-                    .map(|(post, &count)| PostCount {
-                        post: post as u32,
-                        count,
-                    }),
-            );
-            let related = top.map(|it| &posts[it.post as usize]).collect();
-
-            RelatedPosts {
-                id: post.id,
-                tags: &post.tags,
-                related,
+                min_tags = top_n_counts[NUM_TOP_ITEMS - 1];
             }
-        })
-        .collect();
+        }
+
+        related_posts.push(RelatedPosts {
+            id: post.id,
+            tags: &post.tags,
+            related: SmallVec::from_slice(&top_n_posts),
+        });
+    }
 
     // Tell compiler to not delay now() until print is eval'ed.
     let end = hint::black_box(Instant::now());
