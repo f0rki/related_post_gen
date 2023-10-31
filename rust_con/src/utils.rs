@@ -1,10 +1,11 @@
 use rustc_data_structures::fx::FxHasher;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
+use smallvec::SmallVec;
 
 use crate::{
     least::IteratorExt,
-    types::{Post, PostCount},
+    types::{Post, PostCount, RelatedVec},
 };
 
 type FxHashBuilder = BuildHasherDefault<FxHasher>;
@@ -43,7 +44,7 @@ pub fn fill_post_count(
     }
 }
 
-pub fn get_related<'a>(n: usize, post_count: &[u8], posts: &'a [Post]) -> Vec<&'a Post<'a>> {
+pub fn get_related<'a>(n: usize, post_count: &[u8], posts: &'a [Post]) -> RelatedVec<'a> {
     post_count
         .iter()
         .enumerate()
