@@ -1,7 +1,6 @@
 use std::{collections::BinaryHeap, hint, time::Instant};
 
-use bumpalo::collections::Vec as BVec;
-use bumpalo::Bump;
+use smallvec::SmallVec;
 use rustc_data_structures::fx::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
@@ -20,12 +19,15 @@ struct Post<'a> {
 
 const NUM_TOP_ITEMS: usize = 5;
 
+// type RelatedVec<'a> = Vec<&'a Post<'a>>;
+type RelatedVec<'a> = SmallVec<[&'a Post<'a>; NUM_TOP_ITEMS]>;
+
 #[derive(Serialize)]
 struct RelatedPosts<'a> {
     #[serde(rename = "_id")]
     id: &'a str,
     tags: &'a [&'a str],
-    related: Vec<&'a Post<'a>>,
+    related: RelatedVec<'a>,
 }
 
 #[derive(Eq)]
@@ -77,9 +79,6 @@ fn main() {
 
     let start = Instant::now();
 
-    let cap = (posts.len() * std::mem::size_of::<u8>()).next_power_of_two();
-    let arena = Bump::with_capacity(cap);
-
     let mut post_tags_map: FxHashMap<&str, Vec<u32>> = FxHashMap::default();
 
     for (post_idx, post) in posts.iter().enumerate() {
@@ -87,13 +86,16 @@ fn main() {
             post_tags_map.entry(tag).or_default().push(post_idx as u32);
         }
     }
+            
+    let mut tagged_post_count: Vec<u8> = Vec::with_capacity(posts.len());
+    tagged_post_count.resize(posts.len(), 0);
 
     let related_posts: Vec<RelatedPosts<'_>> = posts
         .iter()
         .enumerate()
         .map(|(post_idx, post)| {
-            let mut tagged_post_count: BVec<u8> = BVec::with_capacity_in(posts.len(), &arena);
-            tagged_post_count.resize(posts.len(), 0);
+            // memset to 0
+            tagged_post_count.fill(0);
 
             for tag in &post.tags {
                 if let Some(tag_posts) = post_tags_map.get(tag) {
