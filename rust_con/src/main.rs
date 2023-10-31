@@ -35,7 +35,10 @@ fn main() {
     println!("Processing time (w/o IO): {:?}", end.duration_since(start));
 
     let json_str = serde_json::to_string(&related_posts).unwrap();
+    #[cfg(not(feature = "pgo"))]
     std::fs::write("../related_posts_rust_con.json", json_str).unwrap();
+    #[cfg(feature = "pgo")]
+    std::fs::write("../related_posts_rust_con_pgo.json", json_str).unwrap();
 }
 
 fn get_related<'a>(posts: &'a [Post]) -> Vec<RelatedPosts<'a>> {

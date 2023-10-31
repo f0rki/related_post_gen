@@ -151,7 +151,7 @@ run_rust_pgo() {
             command ${time} -f '%es %Mk' ./target/release/rust
         fi
 
-    check_output "related_posts_rust.json"
+    check_output "related_posts_rust_pgo.json"
 }
 
 run_rust_con() {
@@ -180,7 +180,7 @@ run_rust_con_pgo() {
             command ${time} -f '%es %Mk' ./target/release/rust_rayon
         fi
 
-    check_output "related_posts_rust_con.json"
+    check_output "related_posts_rust_con_pgo.json"
 
 }
 

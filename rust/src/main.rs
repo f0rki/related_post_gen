@@ -134,5 +134,8 @@ fn main() {
     // significantly (15%) when using slices in the hashmap key and RelatedPosts
     let json_str = serde_json::to_string(&related_posts).unwrap();
 
+    #[cfg(not(feature = "pgo"))]
     std::fs::write("../related_posts_rust.json", json_str).unwrap();
+    #[cfg(feature = "pgo")]
+    std::fs::write("../related_posts_rust_pgo.json", json_str).unwrap();
 }
