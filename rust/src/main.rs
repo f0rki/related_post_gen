@@ -1,8 +1,6 @@
-use std::{cmp::Ordering, collections::BinaryHeap, hint, time::Instant};
+use std::{hint, time::Instant};
 
-use bumpalo::collections::Vec as BVec;
-use bumpalo::Bump;
-use rustc_data_structures::fx::FxHashMap;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use smallvec::SmallVec;
@@ -32,11 +30,11 @@ struct RelatedPosts<'a, const TOPN: usize> {
 fn main() {
     let json_str = std::fs::read_to_string("../posts.json").unwrap();
     let posts: Vec<Post> = from_str(&json_str).unwrap();
-    assert!(posts.len() > 5, "current implementation panics for posts that cannot have");
+    assert!(posts.len() > 5, "current implementation panics if less than 5 posts.");
 
     let start = hint::black_box(Instant::now());
 
-    let mut post_tags_map: FxHashMap<&str, SmallVec<[u32; 8]>> = FxHashMap::default();
+    let mut post_tags_map: FxHashMap<&str, SmallVec<[u32; 32]>> = FxHashMap::default();
 
     for (post_idx, post) in posts.iter().enumerate() {
         for tag in &post.tags {
@@ -49,7 +47,9 @@ fn main() {
     tagged_post_count.resize(posts.len(), 0);
 
     for (post_idx, post) in posts.iter().enumerate() {
-        tagged_post_count.fill(0);
+        if post_idx > 0 { // avoid first unnecessary memset
+            tagged_post_count.fill(0);
+        }
 
         for tag in &post.tags {
             if let Some(tag_posts) = post_tags_map.get(tag) {
