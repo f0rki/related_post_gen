@@ -11,7 +11,7 @@ pub struct Post<'a> {
 }
 
 // pub type RelatedVec<'a> = Vec<&'a Post<'a>>;
-pub type RelatedVec<'a> = SmallVec<[&'a Post<'a>; 5]>;
+pub type RelatedVec<'a> = SmallVec<[&'a Post<'a>; crate::NUM_TOP_ITEMS]>;
 
 #[derive(Serialize)]
 #[repr(align(64))]
